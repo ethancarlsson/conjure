@@ -46,6 +46,7 @@ end
 local function eval_str(opts)
   local function _6_(repl)
     local function _7_(msgs)
+      log.dbg(("msgs >> " .. msgs() .. "<<"))
       if ((1 == a.count(msgs)) and ("" == a["get-in"](msgs, {1, "out"}))) then
         a["assoc-in"](msgs, {1, "out"}, (comment_prefix .. "Empty result."))
       else
