@@ -18,6 +18,9 @@
                                                  :stop :cS
                                                  :interrupt :ei}}}}}))
 
+(local localstate {})
+(local import-replacements-key :import-replacements)
+
 (local cfg (config.get-in-fn [:client :go :yaegi]))
 (local state (client.new-state #(do
                                   {:repl nil})))
@@ -42,7 +45,6 @@
     :with_statement true
     :decorated_definition true
     :for_statement true
-    :call true
     _ false))
 
 (fn with-repl-or-warn [f _]
@@ -68,14 +70,43 @@
                     line)))
        (a.filter #(not (str.blank? $1)))))
 
+(fn first-2 [tbl] [(a.first tbl) (a.second tbl)])
+
+(fn mod-name [raw]
+  (-> raw
+      (vim.split "\n")
+      (a.first)
+      (string.gsub :module "")
+      (vim.trim)))
+
+(fn import-rep-map [mod] {(mod-name (a.first mod)) "."})
+
+(fn rep-lines [lines reps]
+  (icollect [_ line (ipairs lines)]
+    (if (string.match line "\"")
+        (accumulate [new-line line from to (pairs reps)]
+          (string.gsub new-line from to))
+        line)))
+
+; Takes in an import statement node and replaces any full package paths with a local 
+; alias if one exists in the current project. E.g. "github.com/user/project/pkg" -> "./pkg"
+(fn localise-imports [imports]
+  (local import-replacements (. localstate import-replacements-key))
+  (-> (vim.split imports "\n")
+      (rep-lines import-replacements)
+      (table.concat "\n")))
+
 (fn eval-str [opts]
-  (with-repl-or-warn (fn [repl]
-                       (repl.send (.. opts.code "\n")
-                                  (fn [msgs]
-                                    (let [msgs (-> msgs unbatch format-msg)]
-                                      (opts.on-result (a.last msgs))
-                                      (log.append msgs)))
-                                  {:batch? true}))))
+  (let [code (if (= (a.pr-str opts.node) "#<<node import_declaration>>")
+                 (localise-imports opts.code)
+                 opts.code)]
+    (with-repl-or-warn (fn [repl]
+                         (repl.send (.. code "\n")
+                                    (fn [msgs]
+                                      (let [msgs (-> msgs unbatch format-msg)]
+                                        (opts.on-result (a.last msgs))
+                                        (log.append msgs)))
+                                    {:batch? true})))))
 
 (fn eval-file [opts]
   (->> (core.slurp opts.file-path)
@@ -94,6 +125,12 @@
       (a.assoc (state) :repl nil))))
 
 (fn start []
+  (tset localstate import-replacements-key
+        (-> (.. (vim.fn.getcwd) :/go.mod)
+            (core.slurp)
+            (vim.split :require)
+            (first-2)
+            (import-rep-map)))
   (if (state :repl)
       (log.append [(.. comment-prefix "Can't start, REPL is already running.")
                    (.. comment-prefix "Stop the REPL with "

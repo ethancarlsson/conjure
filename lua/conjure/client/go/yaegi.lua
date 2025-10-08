@@ -14,6 +14,8 @@ if config["get-in"]({"mapping", "enable_defaults"}) then
   config.merge({client = {go = {yaegi = {mapping = {start = "cs", stop = "cS", interrupt = "ei"}}}}})
 else
 end
+local localstate = {}
+local import_replacements_key = "import-replacements"
 local cfg = config["get-in-fn"]({"client", "go", "yaegi"})
 local state
 local function _3_()
@@ -54,8 +56,6 @@ local function form_node_3f(node)
     return true
   elseif (_4_ == "for_statement") then
     return true
-  elseif (_4_ == "call") then
-    return true
   else
     local _ = _4_
     return false
@@ -90,16 +90,57 @@ local function format_msg(msg)
   end
   return a.filter(_8_, a.map(_9_, str.split(a.get(msg, "out"), "\n")))
 end
+local function first_2(tbl)
+  return {a.first(tbl), a.second(tbl)}
+end
+local function mod_name(raw)
+  return vim.trim(string.gsub(a.first(vim.split(raw, "\n")), "module", ""))
+end
+local function import_rep_map(mod)
+  return {[mod_name(a.first(mod))] = "."}
+end
+local function rep_lines(lines, reps)
+  local tbl_21_auto = {}
+  local i_22_auto = 0
+  for _, line in ipairs(lines) do
+    local val_23_auto
+    if string.match(line, "\"") then
+      local new_line = line
+      for from, to in pairs(reps) do
+        new_line = string.gsub(new_line, from, to)
+      end
+      val_23_auto = new_line
+    else
+      val_23_auto = line
+    end
+    if (nil ~= val_23_auto) then
+      i_22_auto = (i_22_auto + 1)
+      tbl_21_auto[i_22_auto] = val_23_auto
+    else
+    end
+  end
+  return tbl_21_auto
+end
+local function localise_imports(imports)
+  local import_replacements = localstate[import_replacements_key]
+  return table.concat(rep_lines(vim.split(imports, "\n"), import_replacements), "\n")
+end
 local function eval_str(opts)
-  local function _11_(repl)
-    local function _12_(msgs)
+  local code
+  if (a["pr-str"](opts.node) == "#<<node import_declaration>>") then
+    code = localise_imports(opts.code)
+  else
+    code = opts.code
+  end
+  local function _14_(repl)
+    local function _15_(msgs)
       local msgs0 = format_msg(unbatch(msgs))
       opts["on-result"](a.last(msgs0))
       return log.append(msgs0)
     end
-    return repl.send((opts.code .. "\n"), _12_, {["batch?"] = true})
+    return repl.send((code .. "\n"), _15_, {["batch?"] = true})
   end
-  return with_repl_or_warn(_11_)
+  return with_repl_or_warn(_14_)
 end
 local function eval_file(opts)
   return eval_str(core.assoc(opts, "code", core.slurp(opts["file-path"])))
@@ -118,16 +159,17 @@ local function stop()
   end
 end
 local function start()
+  localstate[import_replacements_key] = import_rep_map(first_2(vim.split(core.slurp((vim.fn.getcwd() .. "/go.mod")), "require")))
   if state("repl") then
     return log.append({(comment_prefix .. "Can't start, REPL is already running."), (comment_prefix .. "Stop the REPL with " .. config["get-in"]({"mapping", "prefix"}) .. cfg({"mapping", "stop"}))}, {["break?"] = true})
   else
-    local function _14_()
+    local function _17_()
       return display_repl_status("started")
     end
-    local function _15_(err)
+    local function _18_(err)
       return display_repl_status(err)
     end
-    local function _16_(code, signal)
+    local function _19_(code, signal)
       if (("number" == type(code)) and (code > 0)) then
         log.append({(comment_prefix .. "process exited with code " .. code)})
       else
@@ -138,18 +180,18 @@ local function start()
       end
       return stop()
     end
-    local function _19_(msg)
+    local function _22_(msg)
       return log.append(format_msg(msg))
     end
-    return a.assoc(state(), "repl", stdio.start({["prompt-pattern"] = cfg({"prompt_pattern"}), cmd = cfg({"command"}), ["on-success"] = _14_, ["on-error"] = _15_, ["on-exit"] = _16_, ["on-stray-output"] = _19_}))
+    return a.assoc(state(), "repl", stdio.start({["prompt-pattern"] = cfg({"prompt_pattern"}), cmd = cfg({"command"}), ["on-success"] = _17_, ["on-error"] = _18_, ["on-exit"] = _19_, ["on-stray-output"] = _22_}))
   end
 end
 local function interrupt()
-  local function _21_(repl)
+  local function _24_(repl)
     log.append({(comment_prefix .. " Sending interrupt signal.")}, {["break?"] = true})
     return repl["send-signal"]("sigint")
   end
-  return with_repl_or_warn(_21_)
+  return with_repl_or_warn(_24_)
 end
 local function on_load()
   return start()
