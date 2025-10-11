@@ -49,7 +49,7 @@
     nil))
 
 (M.merge
-  {:debug true
+  {:debug false
    :relative_file_root nil
    :path_subs nil
    :client_on_load true

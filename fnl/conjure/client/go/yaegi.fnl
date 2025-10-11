@@ -7,6 +7,7 @@
 (local mapping (autoload :conjure.mapping))
 (local client (autoload :conjure.client))
 (local log (autoload :conjure.log))
+(local go-mod (autoload :conjure.client.go.go_mod))
 
 (config.merge {:client {:go {:yaegi {:command :yaegi
                                      :prompt_pattern "> "
@@ -70,75 +71,17 @@
                     line)))
        (a.filter #(not (str.blank? $1)))))
 
-(fn first-2 [tbl] [(a.first tbl) (a.second tbl)])
-
-; gets the first string that contains the second arg to this function
-(fn first-matching [tbl str]
-  (each [_ val (pairs tbl)]
-    (when (not= (string.find val str) nil)
-      (lua "return val"))))
-
-(fn mod-name [raw]
-  (-?> raw
-       (vim.trim)
-       (vim.split "\n")
-       (first-matching :module)
-       (string.gsub :module "")
-       (vim.trim)))
-
-(fn str-starts-with [str start]
-  (= (string.sub str 1 (length start)) start))
-
-(fn reqs-map [reqstbl]
-  (collect [_ v (ipairs reqstbl)]
-    (let [rqr (-> v
-                  (vim.trim)
-                  (vim.split " ")
-                  (a.first))]
-      (when (not (or (str-starts-with rqr "(") (str-starts-with rqr ")")
-                     (= rqr "")))
-        (values rqr (.. :./vendor/ rqr))))))
-
-(fn req-names [raw-reqs]
-  (-> raw-reqs
-      (vim.split "\n")
-      (reqs-map)))
-
-; Accepts a list where the first element is the first thing before "require"
-; and the second element is everything after but before the second.
-; Returns the map of modules to their local versions.
-(fn import-rep-map [btwn-reqs]
-  (local res {})
-  (local module-name (mod-name (a.first btwn-reqs)))
-  (local required-modules (a.second btwn-reqs))
-  (when (not= module-name nil)
-    (tset res module-name "."))
-  (when (not= required-modules nil)
-    (each [actual replacement (pairs (-> required-modules (req-names)))]
-      (tset res actual replacement)))
-  res)
-
-(fn remove-comments [mod-file]
-  (->> (icollect [_ line (ipairs (vim.split mod-file "\n"))]
-         (string.gsub line "//.*" ""))
-       (str.join "\n")))
-
-(fn to-import-replacements-map [mod-file]
-  (-> mod-file (remove-comments) (vim.split :require) (first-2)
-      (import-rep-map)))
-
-(fn req-lines [lines reps]
-  (icollect [_ line (ipairs lines)]
-    (if (string.match line "\"")
-        (accumulate [new-line line from to (pairs reps)]
-          (string.gsub new-line from to))
-        line)))
-
 ; Takes in an import statement node and replaces any full package paths with a local 
 ; alias if one exists in the current project. E.g. "github.com/user/project/pkg" -> "./pkg"
 (fn localise-imports [imports]
+  (fn req-lines [lines reps]
+    (icollect [_ line (ipairs lines)]
+      (if (string.match line "\"")
+          (accumulate [new-line line from to (pairs reps)]
+            (string.gsub new-line from to))
+          line)))
+
   (local import-replacements (. localstate import-replacements-key))
-  (log.dbg "modules >>" (vim.inspect import-replacements))
   (-> (vim.split imports "\n")
       (req-lines import-replacements)
       (table.concat "\n")))
@@ -175,7 +118,7 @@
   (tset localstate import-replacements-key
         (-> (.. (vim.fn.getcwd) :/go.mod)
             (core.slurp)
-            (to-import-replacements-map)))
+            (go-mod.to-import-replacements-map)))
   (if (state :repl)
       (log.append [(.. comment-prefix "Can't start, REPL is already running.")
                    (.. comment-prefix "Stop the REPL with "
@@ -235,5 +178,4 @@
  : interrupt
  : on-load
  : on-filetype
- : on-exit
- : to-import-replacements-map}
+ : on-exit}

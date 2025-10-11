@@ -1,20 +1,20 @@
 (local {: describe : it} (require :plenary.busted))
 (local assert (require :luassert.assert))
-(local yaegi (require :conjure.client.go.yaegi))
+(local go-mod (require :conjure.client.go.go_mod))
 
-(describe :yaegi
+(describe :go-mod
           (fn []
             (it "import-replacements-map returns empty table with empty string"
                 (fn []
                   (assert.equal 0
-                                (length (yaegi.to-import-replacements-map "")))))
+                                (length (go-mod.to-import-replacements-map "")))))
             (it "import-replacements-map with invalid input returns empty structure"
                 (fn []
                   (assert.equal 0
-                                (length (yaegi.to-import-replacements-map "require require hello test module")))))
+                                (length (go-mod.to-import-replacements-map "require require hello test module")))))
             (it "import-replacements-map with valid input"
                 (fn []
-                  (local actual (yaegi.to-import-replacements-map "module github.com/user/module
+                  (local actual (go-mod.to-import-replacements-map "module github.com/user/module
 
 go 1.25
 
@@ -29,7 +29,7 @@ require (
                                 (. actual :golang.org/x/crypto))))
             (it "import-replacements-map with module not on first line"
                 (fn []
-                  (local actual (yaegi.to-import-replacements-map "
+                  (local actual (go-mod.to-import-replacements-map "
 \t\t\t\t\t\t\t\t  
 \t\t\t\t\t\t\t\t  
 \t\t\t\t\t\t\t\t  module github.com/user/module
@@ -43,7 +43,7 @@ require (
                   (assert.equal "." (. actual :github.com/user/))))
             (it "import-replacements-map with comments before module"
                 (fn []
-                  (local actual (yaegi.to-import-replacements-map "// testing
+                  (local actual (go-mod.to-import-replacements-map "// testing
                                                                   // testing
                                                                   // this is a module
 \t\t\t\t\t\t\t\t  module github.com/user/module // this is a comment after the module
