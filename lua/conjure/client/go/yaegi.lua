@@ -9,14 +9,11 @@ local config = autoload("conjure.config")
 local mapping = autoload("conjure.mapping")
 local client = autoload("conjure.client")
 local log = autoload("conjure.log")
-local go_mod = autoload("conjure.client.go.go_mod")
 config.merge({client = {go = {yaegi = {command = "yaegi -syscall -unsafe -unrestricted", prompt_pattern = "> ", value_prefix_pattern = "^: ", ["delay-stderr-ms"] = 16}}}})
 if config["get-in"]({"mapping", "enable_defaults"}) then
   config.merge({client = {go = {yaegi = {mapping = {start = "cs", stop = "cS", interrupt = "ei"}}}}})
 else
 end
-local localstate = {}
-local import_replacements_key = "import-replacements"
 local cfg = config["get-in-fn"]({"client", "go", "yaegi"})
 local state
 local function _3_()
@@ -91,43 +88,17 @@ local function format_msg(msg)
   end
   return a.filter(_8_, a.map(_9_, str.split(a.get(msg, "out"), "\n")))
 end
-local function localise_imports(imports)
-  local function req_lines(lines, reps)
-    local tbl_21_ = {}
-    local i_22_ = 0
-    for _, line in ipairs(lines) do
-      local val_23_
-      if string.match(line, "\"") then
-        local new_line = line
-        for from, to in pairs(reps) do
-          new_line = string.gsub(new_line, from, to)
-        end
-        val_23_ = new_line
-      else
-        val_23_ = line
-      end
-      if (nil ~= val_23_) then
-        i_22_ = (i_22_ + 1)
-        tbl_21_[i_22_] = val_23_
-      else
-      end
-    end
-    return tbl_21_
-  end
-  local import_replacements = localstate[import_replacements_key]
-  return table.concat(req_lines(vim.split(imports, "\n"), import_replacements), "\n")
-end
 local function eval_str(opts)
   local code = opts.code
-  local function _13_(repl)
-    local function _14_(msgs)
+  local function _11_(repl)
+    local function _12_(msgs)
       local msgs0 = format_msg(unbatch(msgs))
       opts["on-result"](a.last(msgs0))
       return log.append(msgs0)
     end
-    return repl.send((code .. "\n"), _14_, {["batch?"] = true})
+    return repl.send((code .. "\n"), _12_, {["batch?"] = true})
   end
-  return with_repl_or_warn(_13_)
+  return with_repl_or_warn(_11_)
 end
 local function eval_file(opts)
   return eval_str(core.assoc(opts, "code", core.slurp(opts["file-path"])))
@@ -146,17 +117,16 @@ local function stop()
   end
 end
 local function start()
-  localstate[import_replacements_key] = go_mod["to-import-replacements-map"](core.slurp((vim.fn.getcwd() .. "/go.mod")))
   if state("repl") then
     return log.append({(comment_prefix .. "Can't start, REPL is already running."), (comment_prefix .. "Stop the REPL with " .. config["get-in"]({"mapping", "prefix"}) .. cfg({"mapping", "stop"}))}, {["break?"] = true})
   else
-    local function _16_()
+    local function _14_()
       return display_repl_status("started")
     end
-    local function _17_(err)
+    local function _15_(err)
       return display_repl_status(err)
     end
-    local function _18_(code, signal)
+    local function _16_(code, signal)
       if (("number" == type(code)) and (code > 0)) then
         log.append({(comment_prefix .. "process exited with code " .. code)})
       else
@@ -167,18 +137,18 @@ local function start()
       end
       return stop()
     end
-    local function _21_(msg)
+    local function _19_(msg)
       return log.append(format_msg(msg))
     end
-    return a.assoc(state(), "repl", stdio.start({["prompt-pattern"] = cfg({"prompt_pattern"}), cmd = cfg({"command"}), ["on-success"] = _16_, ["on-error"] = _17_, ["on-exit"] = _18_, ["on-stray-output"] = _21_}))
+    return a.assoc(state(), "repl", stdio.start({["prompt-pattern"] = cfg({"prompt_pattern"}), cmd = cfg({"command"}), ["on-success"] = _14_, ["on-error"] = _15_, ["on-exit"] = _16_, ["on-stray-output"] = _19_}))
   end
 end
 local function interrupt()
-  local function _23_(repl)
+  local function _21_(repl)
     log.append({(comment_prefix .. " Sending interrupt signal.")}, {["break?"] = true})
     return repl["send-signal"]("sigint")
   end
-  return with_repl_or_warn(_23_)
+  return with_repl_or_warn(_21_)
 end
 local function on_load()
   return start()

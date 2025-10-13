@@ -7,7 +7,6 @@
 (local mapping (autoload :conjure.mapping))
 (local client (autoload :conjure.client))
 (local log (autoload :conjure.log))
-(local go-mod (autoload :conjure.client.go.go_mod))
 
 (config.merge {:client {:go {:yaegi {:command "yaegi -syscall -unsafe -unrestricted"
                                      :prompt_pattern "> "
@@ -18,9 +17,6 @@
   (config.merge {:client {:go {:yaegi {:mapping {:start :cs
                                                  :stop :cS
                                                  :interrupt :ei}}}}}))
-
-(local localstate {})
-(local import-replacements-key :import-replacements)
 
 (local cfg (config.get-in-fn [:client :go :yaegi]))
 (local state (client.new-state #(do
@@ -71,21 +67,6 @@
                     line)))
        (a.filter #(not (str.blank? $1)))))
 
-; Takes in an import statement node and replaces any full package paths with a local 
-; alias if one exists in the current project. E.g. "github.com/user/project/pkg" -> "./pkg"
-(fn localise-imports [imports]
-  (fn req-lines [lines reps]
-    (icollect [_ line (ipairs lines)]
-      (if (string.match line "\"")
-          (accumulate [new-line line from to (pairs reps)]
-            (string.gsub new-line from to))
-          line)))
-
-  (local import-replacements (. localstate import-replacements-key))
-  (-> (vim.split imports "\n")
-      (req-lines import-replacements)
-      (table.concat "\n")))
-
 (fn eval-str [opts]
   (let [code opts.code]
     (with-repl-or-warn (fn [repl]
@@ -113,10 +94,6 @@
       (a.assoc (state) :repl nil))))
 
 (fn start []
-  (tset localstate import-replacements-key
-        (-> (.. (vim.fn.getcwd) :/go.mod)
-            (core.slurp)
-            (go-mod.to-import-replacements-map)))
   (if (state :repl)
       (log.append [(.. comment-prefix "Can't start, REPL is already running.")
                    (.. comment-prefix "Stop the REPL with "
