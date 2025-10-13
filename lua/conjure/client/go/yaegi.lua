@@ -10,7 +10,7 @@ local mapping = autoload("conjure.mapping")
 local client = autoload("conjure.client")
 local log = autoload("conjure.log")
 local go_mod = autoload("conjure.client.go.go_mod")
-config.merge({client = {go = {yaegi = {command = "yaegi", prompt_pattern = "> ", value_prefix_pattern = "^: ", ["delay-stderr-ms"] = 16}}}})
+config.merge({client = {go = {yaegi = {command = "yaegi -syscall -unsafe -unrestricted", prompt_pattern = "> ", value_prefix_pattern = "^: ", ["delay-stderr-ms"] = 16}}}})
 if config["get-in"]({"mapping", "enable_defaults"}) then
   config.merge({client = {go = {yaegi = {mapping = {start = "cs", stop = "cS", interrupt = "ei"}}}}})
 else
@@ -93,46 +93,41 @@ local function format_msg(msg)
 end
 local function localise_imports(imports)
   local function req_lines(lines, reps)
-    local tbl_21_auto = {}
-    local i_22_auto = 0
+    local tbl_21_ = {}
+    local i_22_ = 0
     for _, line in ipairs(lines) do
-      local val_23_auto
+      local val_23_
       if string.match(line, "\"") then
         local new_line = line
         for from, to in pairs(reps) do
           new_line = string.gsub(new_line, from, to)
         end
-        val_23_auto = new_line
+        val_23_ = new_line
       else
-        val_23_auto = line
+        val_23_ = line
       end
-      if (nil ~= val_23_auto) then
-        i_22_auto = (i_22_auto + 1)
-        tbl_21_auto[i_22_auto] = val_23_auto
+      if (nil ~= val_23_) then
+        i_22_ = (i_22_ + 1)
+        tbl_21_[i_22_] = val_23_
       else
       end
     end
-    return tbl_21_auto
+    return tbl_21_
   end
   local import_replacements = localstate[import_replacements_key]
   return table.concat(req_lines(vim.split(imports, "\n"), import_replacements), "\n")
 end
 local function eval_str(opts)
-  local code
-  if (a["pr-str"](opts.node) == "#<<node import_declaration>>") then
-    code = localise_imports(opts.code)
-  else
-    code = opts.code
-  end
-  local function _14_(repl)
-    local function _15_(msgs)
+  local code = opts.code
+  local function _13_(repl)
+    local function _14_(msgs)
       local msgs0 = format_msg(unbatch(msgs))
       opts["on-result"](a.last(msgs0))
       return log.append(msgs0)
     end
-    return repl.send((code .. "\n"), _15_, {["batch?"] = true})
+    return repl.send((code .. "\n"), _14_, {["batch?"] = true})
   end
-  return with_repl_or_warn(_14_)
+  return with_repl_or_warn(_13_)
 end
 local function eval_file(opts)
   return eval_str(core.assoc(opts, "code", core.slurp(opts["file-path"])))
@@ -155,13 +150,13 @@ local function start()
   if state("repl") then
     return log.append({(comment_prefix .. "Can't start, REPL is already running."), (comment_prefix .. "Stop the REPL with " .. config["get-in"]({"mapping", "prefix"}) .. cfg({"mapping", "stop"}))}, {["break?"] = true})
   else
-    local function _17_()
+    local function _16_()
       return display_repl_status("started")
     end
-    local function _18_(err)
+    local function _17_(err)
       return display_repl_status(err)
     end
-    local function _19_(code, signal)
+    local function _18_(code, signal)
       if (("number" == type(code)) and (code > 0)) then
         log.append({(comment_prefix .. "process exited with code " .. code)})
       else
@@ -172,18 +167,18 @@ local function start()
       end
       return stop()
     end
-    local function _22_(msg)
+    local function _21_(msg)
       return log.append(format_msg(msg))
     end
-    return a.assoc(state(), "repl", stdio.start({["prompt-pattern"] = cfg({"prompt_pattern"}), cmd = cfg({"command"}), ["on-success"] = _17_, ["on-error"] = _18_, ["on-exit"] = _19_, ["on-stray-output"] = _22_}))
+    return a.assoc(state(), "repl", stdio.start({["prompt-pattern"] = cfg({"prompt_pattern"}), cmd = cfg({"command"}), ["on-success"] = _16_, ["on-error"] = _17_, ["on-exit"] = _18_, ["on-stray-output"] = _21_}))
   end
 end
 local function interrupt()
-  local function _24_(repl)
+  local function _23_(repl)
     log.append({(comment_prefix .. " Sending interrupt signal.")}, {["break?"] = true})
     return repl["send-signal"]("sigint")
   end
-  return with_repl_or_warn(_24_)
+  return with_repl_or_warn(_23_)
 end
 local function on_load()
   return start()

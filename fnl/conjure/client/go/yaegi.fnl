@@ -9,7 +9,7 @@
 (local log (autoload :conjure.log))
 (local go-mod (autoload :conjure.client.go.go_mod))
 
-(config.merge {:client {:go {:yaegi {:command :yaegi
+(config.merge {:client {:go {:yaegi {:command "yaegi -syscall -unsafe -unrestricted"
                                      :prompt_pattern "> "
                                      :value_prefix_pattern "^: "
                                      :delay-stderr-ms 16}}}})
@@ -87,9 +87,7 @@
       (table.concat "\n")))
 
 (fn eval-str [opts]
-  (let [code (if (= (a.pr-str opts.node) "#<<node import_declaration>>")
-                 (localise-imports opts.code)
-                 opts.code)]
+  (let [code opts.code]
     (with-repl-or-warn (fn [repl]
                          (repl.send (.. code "\n")
                                     (fn [msgs]
