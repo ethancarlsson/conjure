@@ -38,6 +38,7 @@
     :type_declaration true
     :function_declaration true
     :method_declaration true
+    :import_spec true
     :import_declaration true
     :with_statement true
     :decorated_definition true
@@ -68,7 +69,9 @@
        (a.filter #(not (str.blank? $1)))))
 
 (fn eval-str [opts]
-  (let [code opts.code]
+  (let [code (case (a.pr-str opts.node)
+                "#<<node import_spec>>" (.. "import " opts.code)
+               _ opts.code)]
     (with-repl-or-warn (fn [repl]
                          (repl.send (.. code "\n")
                                     (fn [msgs]

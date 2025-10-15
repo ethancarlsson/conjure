@@ -46,6 +46,8 @@ local function form_node_3f(node)
     return true
   elseif (_4_ == "method_declaration") then
     return true
+  elseif (_4_ == "import_spec") then
+    return true
   elseif (_4_ == "import_declaration") then
     return true
   elseif (_4_ == "with_statement") then
@@ -89,16 +91,25 @@ local function format_msg(msg)
   return a.filter(_8_, a.map(_9_, str.split(a.get(msg, "out"), "\n")))
 end
 local function eval_str(opts)
-  local code = opts.code
-  local function _11_(repl)
-    local function _12_(msgs)
+  local code
+  do
+    local _11_ = a["pr-str"](opts.node)
+    if (_11_ == "#<<node import_spec>>") then
+      code = ("import " .. opts.code)
+    else
+      local _ = _11_
+      code = opts.code
+    end
+  end
+  local function _13_(repl)
+    local function _14_(msgs)
       local msgs0 = format_msg(unbatch(msgs))
       opts["on-result"](a.last(msgs0))
       return log.append(msgs0)
     end
-    return repl.send((code .. "\n"), _12_, {["batch?"] = true})
+    return repl.send((code .. "\n"), _14_, {["batch?"] = true})
   end
-  return with_repl_or_warn(_11_)
+  return with_repl_or_warn(_13_)
 end
 local function eval_file(opts)
   return eval_str(core.assoc(opts, "code", core.slurp(opts["file-path"])))
@@ -120,13 +131,13 @@ local function start()
   if state("repl") then
     return log.append({(comment_prefix .. "Can't start, REPL is already running."), (comment_prefix .. "Stop the REPL with " .. config["get-in"]({"mapping", "prefix"}) .. cfg({"mapping", "stop"}))}, {["break?"] = true})
   else
-    local function _14_()
+    local function _16_()
       return display_repl_status("started")
     end
-    local function _15_(err)
+    local function _17_(err)
       return display_repl_status(err)
     end
-    local function _16_(code, signal)
+    local function _18_(code, signal)
       if (("number" == type(code)) and (code > 0)) then
         log.append({(comment_prefix .. "process exited with code " .. code)})
       else
@@ -137,18 +148,18 @@ local function start()
       end
       return stop()
     end
-    local function _19_(msg)
+    local function _21_(msg)
       return log.append(format_msg(msg))
     end
-    return a.assoc(state(), "repl", stdio.start({["prompt-pattern"] = cfg({"prompt_pattern"}), cmd = cfg({"command"}), ["on-success"] = _14_, ["on-error"] = _15_, ["on-exit"] = _16_, ["on-stray-output"] = _19_}))
+    return a.assoc(state(), "repl", stdio.start({["prompt-pattern"] = cfg({"prompt_pattern"}), cmd = cfg({"command"}), ["on-success"] = _16_, ["on-error"] = _17_, ["on-exit"] = _18_, ["on-stray-output"] = _21_}))
   end
 end
 local function interrupt()
-  local function _21_(repl)
+  local function _23_(repl)
     log.append({(comment_prefix .. " Sending interrupt signal.")}, {["break?"] = true})
     return repl["send-signal"]("sigint")
   end
-  return with_repl_or_warn(_21_)
+  return with_repl_or_warn(_23_)
 end
 local function on_load()
   return start()
